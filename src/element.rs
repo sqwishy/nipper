@@ -15,7 +15,7 @@ impl<'a> selectors::Element for Node<'a> {
 
     // Converts self into an opaque representation.
     fn opaque(&self) -> OpaqueElement {
-        OpaqueElement::new(&self.id)
+        self.tree.query_node(&self.id, OpaqueElement::new)
     }
 
     fn parent_element(&self) -> Option<Self> {

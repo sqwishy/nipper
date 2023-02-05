@@ -4,7 +4,6 @@ use html5ever::{LocalName, Namespace};
 use selectors::matching;
 use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
-use selectors::Element;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -12,6 +11,7 @@ use std::fmt;
 #[derive(Clone, Debug)]
 pub struct Matcher {
     selector_list: SelectorList<InnerSelector>,
+    pub scope: Option<NodeId>,
 }
 
 impl Matcher {
@@ -19,20 +19,26 @@ impl Matcher {
     pub fn new(sel: &str) -> Result<Self, ParseError<SelectorParseErrorKind>> {
         let mut input = cssparser::ParserInput::new(sel);
         let mut parser = cssparser::Parser::new(&mut input);
-        selectors::parser::SelectorList::parse(&InnerSelectorParser, &mut parser)
-            .map(|selector_list| Matcher { selector_list })
+        selectors::parser::SelectorList::parse(&InnerSelectorParser, &mut parser).map(
+            |selector_list| Matcher {
+                selector_list,
+                scope: None,
+            },
+        )
     }
 
-    pub(crate) fn match_element<E>(&self, element: &E) -> bool
-    where
-        E: Element<Impl = InnerSelector>,
-    {
+    pub(crate) fn match_element(&self, element: &crate::Node) -> bool {
         let mut ctx = matching::MatchingContext::new(
             matching::MatchingMode::Normal,
             None,
             None,
             matching::QuirksMode::NoQuirks,
         );
+
+        ctx.scope_element = self
+            .scope
+            .as_ref()
+            .map(|id| element.tree.query_node(id, selectors::OpaqueElement::new));
 
         matching::matches_selector_list(&self.selector_list, element, &mut ctx)
     }

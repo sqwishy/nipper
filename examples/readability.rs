@@ -158,7 +158,7 @@ fn remove_attrs(s: &Selection) {
             .get(0)
             .unwrap()
             .node_name()
-            .unwrap_or(tendril::StrTendril::new());
+            .unwrap_or(nipper::StrTendril::new());
         if tag_name.to_lowercase() == "svg" {
             return;
         }
@@ -384,7 +384,7 @@ fn get_article_title(doc: &Document) -> Option<String> {
         .iter()
         .next()
         .map(|t| t.text())
-        .unwrap_or_else(|| tendril::StrTendril::new());
+        .unwrap_or_else(|| nipper::StrTendril::new());
 
     Some(original_title.to_string())
 }
@@ -415,7 +415,7 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (String, Option<String>) 
     for node in doc.select("*").nodes() {
         let tag_name = node
             .node_name()
-            .unwrap_or_else(|| tendril::StrTendril::new());
+            .unwrap_or_else(|| nipper::StrTendril::new());
 
         let mut sel = Selection::from(node.clone());
         let class: &str = &sel.attr_or("class", "");
@@ -581,6 +581,8 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (String, Option<String>) 
 
             if append_sibling {
                 let html = sibling.html();
+                use nipper::IntoNonAtomic;
+                let html = html.into_non_atomic();
                 content.append_html(html);
             }
         });

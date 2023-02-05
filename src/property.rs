@@ -1,6 +1,6 @@
 use crate::Document;
 use crate::Selection;
-use tendril::StrTendril;
+use crate::dom_tree::StrTendril;
 
 impl Document {
     /// Gets the HTML contents of the document. It includes

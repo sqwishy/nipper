@@ -38,12 +38,16 @@ mod selection;
 mod traversal;
 
 pub use document::Document;
+pub use document::IntoAtomic;
 pub use dom_tree::Node;
 #[doc(hidden)]
 pub use dom_tree::NodeId;
 pub use dom_tree::NodeRef;
 #[doc(hidden)]
 pub use dom_tree::SerializableNodeRef;
+pub use dom_tree::StrTendril;
+pub use matcher::MatchScope;
 pub use matcher::Matcher;
+pub use matcher::Matches;
 pub use selection::Selection;
 pub use traversal::Selections;

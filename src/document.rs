@@ -3,16 +3,15 @@ use crate::dom_tree::Element;
 use crate::dom_tree::NodeData;
 use crate::dom_tree::NodeId;
 use crate::dom_tree::NodeRef;
+use crate::dom_tree::StrTendril;
 use crate::dom_tree::Tree;
 use html5ever::parse_document;
 use markup5ever::interface::tree_builder;
 use markup5ever::interface::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
-use markup5ever::Attribute;
 use markup5ever::ExpandedName;
 use markup5ever::QualName;
 use std::borrow::Cow;
 use std::collections::HashSet;
-use tendril::StrTendril;
 use tendril::TendrilSink;
 
 /// Document represents an HTML document to be manipulated.
@@ -43,8 +42,8 @@ impl From<&str> for Document {
     }
 }
 
-impl From<StrTendril> for Document {
-    fn from(html: StrTendril) -> Document {
+impl From<tendril::StrTendril> for Document {
+    fn from(html: tendril::StrTendril) -> Document {
         parse_document(Document::default(), Default::default()).one(html)
     }
 }
@@ -59,6 +58,10 @@ impl Document {
     /// Return the underlying root document node.
     pub fn root(&self) -> NodeRef<NodeData> {
         self.tree.root()
+    }
+
+    pub fn node(&self, nid: NodeId) -> NodeRef<NodeData> {
+        NodeRef::new(nid, &self.tree)
     }
 }
 
@@ -123,7 +126,7 @@ impl TreeSink for Document {
     fn create_element(
         &mut self,
         name: QualName,
-        attrs: Vec<Attribute>,
+        attrs: Vec<markup5ever::Attribute>,
         flags: ElementFlags,
     ) -> NodeId {
         let template_contents = if flags.template {
@@ -134,7 +137,7 @@ impl TreeSink for Document {
 
         let id = self.tree.create_node(NodeData::Element(Element::new(
             name.clone(),
-            attrs,
+            attrs.into_iter().map(Into::into).collect(),
             template_contents,
             flags.mathml_annotation_xml_integration_point,
         )));
@@ -144,15 +147,16 @@ impl TreeSink for Document {
     }
 
     // Create a comment node.
-    fn create_comment(&mut self, text: StrTendril) -> NodeId {
-        self.tree.create_node(NodeData::Comment { contents: text })
+    fn create_comment(&mut self, text: tendril::StrTendril) -> NodeId {
+        let contents = text.into_atomic();
+        self.tree.create_node(NodeData::Comment { contents })
     }
 
     // Create a Processing Instruction node.
-    fn create_pi(&mut self, target: StrTendril, data: StrTendril) -> NodeId {
+    fn create_pi(&mut self, target: tendril::StrTendril, data: tendril::StrTendril) -> NodeId {
         self.tree.create_node(NodeData::ProcessingInstruction {
-            target: target,
-            contents: data,
+            target: target.into_atomic(),
+            contents: data.into_atomic(),
         })
     }
 
@@ -177,8 +181,9 @@ impl TreeSink for Document {
                     return;
                 }
 
+                let contents = text.into_atomic();
                 self.tree
-                    .append_child_data_of(parent, NodeData::Text { contents: text })
+                    .append_child_data_of(parent, NodeData::Text { contents })
             }
         }
     }
@@ -202,7 +207,8 @@ impl TreeSink for Document {
                     return;
                 }
 
-                let id = self.tree.create_node(NodeData::Text { contents: text });
+                let contents = text.into_atomic();
+                let id = self.tree.create_node(NodeData::Text { contents });
                 self.tree.append_prev_sibling_of(sibling, &id);
             }
 
@@ -235,24 +241,24 @@ impl TreeSink for Document {
     // Append a `DOCTYPE` element to the `Document` node.
     fn append_doctype_to_document(
         &mut self,
-        name: StrTendril,
-        public_id: StrTendril,
-        system_id: StrTendril,
+        name: tendril::StrTendril,
+        public_id: tendril::StrTendril,
+        system_id: tendril::StrTendril,
     ) {
         let root = self.tree.root_id();
         self.tree.append_child_data_of(
             &root,
             NodeData::Doctype {
-                name: name,
-                public_id: public_id,
-                system_id: system_id,
+                name: name.into_atomic(),
+                public_id: public_id.into_atomic(),
+                system_id: system_id.into_atomic(),
             },
         );
     }
 
     // Add each attribute to the given element, if no attribute with that name already exists. The tree builder
     // promises this will never be called with something else than an element.
-    fn add_attrs_if_missing(&mut self, target: &NodeId, attrs: Vec<Attribute>) {
+    fn add_attrs_if_missing(&mut self, target: &NodeId, attrs: Vec<markup5ever::Attribute>) {
         self.tree.update_node(target, |node| {
             let existing = if let NodeData::Element(Element { ref mut attrs, .. }) = node.data {
                 attrs
@@ -266,7 +272,8 @@ impl TreeSink for Document {
             existing.extend(
                 attrs
                     .into_iter()
-                    .filter(|attr| !existing_names.contains(&attr.name)),
+                    .filter(|attr| !existing_names.contains(&attr.name))
+                    .map(Into::into),
             );
         })
     }
@@ -279,6 +286,22 @@ impl TreeSink for Document {
     // Remove all the children from node and append them to new_parent.
     fn reparent_children(&mut self, node: &NodeId, new_parent: &NodeId) {
         self.tree.reparent_children_of(node, Some(*new_parent));
+    }
+}
+
+pub trait IntoAtomic {
+    fn into_atomic(self) -> StrTendril;
+}
+
+impl IntoAtomic for StrTendril {
+    fn into_atomic(self) -> StrTendril {
+        self
+    }
+}
+
+impl IntoAtomic for tendril::StrTendril {
+    fn into_atomic(self) -> StrTendril {
+        self.into_send().into()
     }
 }
 

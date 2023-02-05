@@ -1,17 +1,18 @@
+use crate::document::IntoAtomic;
 use html5ever::serialize;
 use html5ever::serialize::SerializeOpts;
 use html5ever::LocalName;
 use markup5ever::serialize::TraversalScope;
 use markup5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
 use markup5ever::serialize::{Serialize, Serializer};
-use markup5ever::Attribute;
 use markup5ever::QualName;
 use markup5ever::{namespace_url, ns};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug};
 use std::io;
-use tendril::StrTendril;
+
+pub type StrTendril = tendril::Tendril<tendril::fmt::UTF8, tendril::Atomic>;
 
 /// Alias for `NodeRef`.
 pub type Node<'a> = NodeRef<'a, NodeData>;
@@ -675,8 +676,16 @@ impl<'a, T: Debug> NodeRef<'a, T> {
         self.tree.first_child_of(&self.id)
     }
 
+    pub fn last_child(&self) -> Option<Self> {
+        self.tree.last_child_of(&self.id)
+    }
+
     pub fn next_sibling(&self) -> Option<Self> {
         self.tree.next_sibling_of(&self.id)
+    }
+
+    pub fn prev_sibling(&self) -> Option<Self> {
+        self.tree.prev_sibling_of(&self.id)
     }
 
     pub fn remove_from_parent(&self) {
@@ -997,7 +1006,7 @@ pub struct Element {
     /// Whether the node is a [HTML integration point].
     ///
     /// [HTML integration point]: https://html.spec.whatwg.org/multipage/#html-integration-point
-    mathml_annotation_xml_integration_point: bool,
+    pub mathml_annotation_xml_integration_point: bool,
 }
 
 impl Element {
@@ -1013,6 +1022,20 @@ impl Element {
             template_contents,
             mathml_annotation_xml_integration_point,
         }
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+pub struct Attribute {
+    pub name: QualName,
+    pub value: StrTendril,
+}
+
+impl From<markup5ever::Attribute> for Attribute {
+    fn from(other: markup5ever::Attribute) -> Self {
+        let markup5ever::Attribute { name, value } = other;
+        let value = value.into_atomic();
+        Attribute { name, value }
     }
 }
 
